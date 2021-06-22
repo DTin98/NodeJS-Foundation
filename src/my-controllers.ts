@@ -14,10 +14,10 @@ import {
   Post,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
-import { Params } from 'express-serve-static-core';
+import { plainToClass } from 'class-transformer';
+import { IsInt, IsString, validate } from 'class-validator';
 
-//ParseIntPipe
+//Use ParseIntPipe
 @Controller('basic')
 export class Basic {
   @Get(':id')
@@ -37,7 +37,7 @@ class MyParseIntPipe implements PipeTransform {
   transform(value: string, metadata: ArgumentMetadata): number {
     const val = parseInt(value);
     if (isNaN(val)) {
-      throw new BadRequestException('Validation Failed HIHI');
+      throw new BadRequestException('Validation Failed KAKA');
     }
     return val;
   }
@@ -49,10 +49,37 @@ export class CustomParseUuid {
     return id;
   }
 }
+class ValidationPipe implements PipeTransform<any> {
+  async transform(value: any, { metatype }: ArgumentMetadata) {
+    if (!metatype || !this.toValidate(metatype)) {
+      return value;
+    }
+    const object = plainToClass(metatype, value);
+    const errors = await validate(object);
+    if (errors.length > 0) {
+      throw new BadRequestException('Validation failed');
+    }
+    return value;
+  }
 
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  private toValidate(metatype: Function): boolean {
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    const types: Function[] = [String, Boolean, Number, Array, Object];
+    return !types.includes(metatype);
+  }
+}
+class createCatDto {
+  @IsString()
+  name: string;
 
-class ValidationPipe implements PipeTransform {
-  transform(value: any, metadata: ArgumentMetadata) {
-    throw new Error('Method not implemented.');
+  @IsInt()
+  age: number;
+}
+@Controller('cats')
+export class CatsController {
+  @Post()
+  create(@Body(new ValidationPipe()) createCatDto: createCatDto): createCatDto {
+    return createCatDto;
   }
 }
